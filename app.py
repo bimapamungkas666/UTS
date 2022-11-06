@@ -6,7 +6,7 @@ from sklearn.naive_bayes import MultinomialNB
 # from sklearn.externals import joblib
 
 
-app = Flask(__name__)
+app = Flask(_name_)
 
 @app.route('/')
 def home():
@@ -14,26 +14,81 @@ def home():
 
 @app.route('/predict',methods=['POST'])
 def predict():
-	df= pd.read_csv("spam.csv", encoding="latin-1")
-	df.drop(['Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4'], axis=1, inplace=True)
-	# Features and Labels
-	df['label'] = df['type'].map({'ham': 0, 'spam': 1})
-	X = df['text']
+	
+	filename = "https://raw.githubusercontent.com/bimapamungkas666/UTS/main/hasil.csv"
+	df = pd.read_csv(filename)
+	df.drop(columns=['wisata_name', 'name'], inplace=True)
+
+	import string
+	import re
+	def clean_review(review):
+		return re.sub('[^a-zA-Z]', ' ', review).lower()
+
+	df['cleaned_review'] = df['review'].apply(lambda x: clean_review(str(x)))
+	df['label'] = df['rating'].map({1.0: 0, 2.0: 0, 3.0: 0, 4.0: 1, 5.0: 1})
+
+	def count_punct(review):
+		count = sum([1 for char in review if char in string.punctuation])
+		return round(count / (len(review) - review.count(" ")), 3) * 100
+
+	df['review_len'] = df['review'].apply(lambda x: len(str(x)) - str(x).count(" "))
+	df['punct'] = df['review'].apply(lambda x: count_punct(str(x)))
+	df
+
+	def tokenize_review(review):
+		tokenized_review = review.split()
+		return tokenized_review
+
+	df['tokens'] = df['cleaned_review'].apply(lambda x: tokenize_review(x))
+	df.head()
+
+	import nltk
+	nltk.download('wordnet')
+	nltk.download('omw-1.4')
+	nltk.download('stopwords')
+	from nltk.corpus import stopwords
+	all_stopwords = stopwords.words('english')
+	all_stopwords.remove('not')
+
+	def lemmatize_review(token_list):
+		return " ".join([lemmatizer.lemmatize(token) for token in token_list if not token in set(all_stopwords)])
+
+	lemmatizer = nltk.stem.WordNetLemmatizer()
+	df['lemmatized_review'] = df['tokens'].apply(lambda x: lemmatize_review(x))
+	df.head()
+
+	X = df[['lemmatized_review', 'review_len', 'punct']]
 	y = df['label']
-	
-	# Extract Feature With CountVectorizer
-	# Extract Feature With CountVectorizer :cleaning involved converting all of our data to lower case and removing all punctuation marks. 
-	cv = CountVectorizer()
-	X = cv.fit_transform(X) # Fit the Data
+	print(X.shape)
+	print(y.shape)
+
 	from sklearn.model_selection import train_test_split
-	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-	#Naive Bayes Classifier
+	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
+	print(X_train.shape)
+	print(X_test.shape)
+	print(y_train.shape)
+	print(y_test.shape)
+
+	from sklearn.feature_extraction.text import TfidfVectorizer
+	tfidf = TfidfVectorizer(max_df=0.5,
+							min_df=2)  # ignore terms that occur in more than 50% documents and the ones that occur in less than 2
+	tfidf_train = tfidf.fit_transform(X_train['lemmatized_review'])
+	tfidf_test = tfidf.transform(X_test['lemmatized_review'])
+
+	from sklearn.feature_extraction.text import CountVectorizer
+	cv = CountVectorizer()
+	X_cv = cv.fit_transform(df['lemmatized_review'])  # Fit the Data
+	y_cv = df['label']
+
+	from sklearn.model_selection import train_test_split
+	X_train_cv, X_test_cv, y_train_cv, y_test_cv = train_test_split(X_cv, y_cv, test_size=0.3, random_state=42)
+
+	# Naive Bayes Classifier
 	from sklearn.naive_bayes import MultinomialNB
-#particular classifier is suitable for classification with discrete features ( word counts for text classification). It takes in integer word counts as its input. 
-	clf = MultinomialNB() #NAIVE BAYES
-	clf.fit(X_train,y_train)
-	clf.score(X_test,y_test)
-	
+	clf = MultinomialNB()
+
+	clf.fit(X_train_cv, y_train_cv)
+	clf.score(X_test_cv, y_test_cv)
 
 
 
@@ -48,5 +103,5 @@ def predict():
 
 
 
-if __name__ == '__main__':
+if _name_ == '_main_':
 	app.run(debug=True)
