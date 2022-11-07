@@ -16,7 +16,7 @@ def home():
 def predict():
 	filename = "https://raw.githubusercontent.com/bimapamungkas666/UTS/main/hasil.csv"
 	df = pd.read_csv(filename)
-	df.drop(columns=['gacoan_name', 'name'], inplace=True)
+	df.drop(columns=['wisata_name', 'name'], inplace=True)
 
 	import string
 	import re
